@@ -21,7 +21,7 @@ services:
   # 1. Databases
   # ==========================================
   postgres-main:
-    image: postgres:15
+    image: postgres:15.20
     container_name: postgres-main
     env_file: .env
     environment:
@@ -41,7 +41,7 @@ services:
       start_period: 5s
 
   postgres-airflow:
-    image: postgres:15
+    image: postgres:15.20
     container_name: postgres-airflow
     env_file: .env
     environment:
@@ -59,7 +59,7 @@ services:
       start_period: 5s
 
   postgres-metabase:
-    image: postgres:15
+    image: postgres:15.20
     container_name: postgres-metabase
     env_file: .env
     environment:
@@ -202,7 +202,7 @@ services:
   # 4. OLAP & BI
   # ==========================================
   clickhouse:
-    image: clickhouse/clickhouse-server:24
+    image: clickhouse/clickhouse-server:24@sha256:2113951827761e37c386b37f716dbdf8522b9172488a44b97a96fe6059e172a8
     container_name: clickhouse
     env_file: .env
     environment:
@@ -219,8 +219,21 @@ services:
         soft: 262144
         hard: 262144
 
+  warehouse-refresh:
+    build: ./airflow
+    profiles: ["warehouse"]
+    env_file: .env
+    environment:
+      PYTHONPATH: /opt/airflow/plugins
+      CLICKHOUSE_INTERNAL_HTTP_PORT: 8123
+    entrypoint: ["python", "-m", "helpers.warehouse_refresh"]
+    command: []
+    volumes:
+      - ./airflow/plugins:/opt/airflow/plugins:ro
+      - ./airflow/dags/sql:/opt/airflow/dags/sql:ro
+
   metabase:
-    image: metabase/metabase:latest
+    image: metabase/metabase:v0.65.4.4
     container_name: metabase
     env_file: .env
     environment:

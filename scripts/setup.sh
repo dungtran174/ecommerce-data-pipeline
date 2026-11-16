@@ -58,7 +58,7 @@ echo "    ✓ PostgreSQL (Main) is healthy."
 
 echo "  - Checking ClickHouse..."
 for attempt in $(seq 1 90); do
-    if ${DOCKER_COMPOSE_CMD} exec -T clickhouse sh -lc 'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query "SELECT count() FROM report.view_delivered_order_aov"' >/dev/null 2>&1; then
+    if ${DOCKER_COMPOSE_CMD} exec -T clickhouse sh -lc 'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query "SELECT count() FROM bronze.orderdetails"' >/dev/null 2>&1; then
         break
     fi
     if [ "$attempt" -eq 90 ]; then
@@ -79,16 +79,26 @@ ${DOCKER_COMPOSE_CMD} exec -T clickhouse sh -lc \
     'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --multiquery' \
     < clickhouse/init/05_quarantine_events.sql
 python3 scripts/migrate_kafka_consumers.py
-echo "  - Refreshing reporting views..."
-${DOCKER_COMPOSE_CMD} exec -T clickhouse sh -lc \
-    'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --multiquery' \
-    < clickhouse/init/04_reporting_views.sql
 ${DOCKER_COMPOSE_CMD} exec -T postgres-main sh -lc \
     'psql -X -v ON_ERROR_STOP=1 -1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
     < postgres/init/03_snapshot_unit_cost.sql
 
 echo "  - Checking Debezium..."
 bash "${SCRIPT_DIR}/register_connector.sh"
+
+echo "  - Building and publishing the physical Silver/Gold warehouse..."
+# Derived-layer migration only: never reset source data or Kafka offsets.
+for attempt in $(seq 1 3); do
+    if ${DOCKER_COMPOSE_CMD} --profile warehouse run --build --rm --no-deps warehouse-refresh --migrate; then
+        break
+    fi
+    if [ "$attempt" -eq 3 ]; then
+        echo "Warehouse bootstrap failed. Inspect refresh validation errors; source data was not reset." >&2
+        exit 1
+    fi
+    echo "  - Warehouse not ready; retrying in 10 seconds (CDC may still be catching up)..."
+    sleep 10
+done
 
 echo "  - Starting Airflow, Metabase, and service UIs..."
 ${DOCKER_COMPOSE_CMD} up -d
@@ -153,5 +163,5 @@ echo "  • ClickHouse HTTP:     http://localhost:$(env_port CLICKHOUSE_HTTP_POR
 echo "  • PostgreSQL OLTP:     localhost:$(env_port POSTGRES_PORT 5432)"
 echo "================================================================="
 echo "  Next steps:"
-echo "    - Enable seed, catalog, user, and order DAGs in Airflow to generate traffic."
+echo "    - Enable seed, catalog, user, and order DAGs; enable etl_fact_sales_product to refresh Silver/Gold every 5 minutes."
 echo "================================================================="

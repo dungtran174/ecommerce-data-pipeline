@@ -1,73 +1,38 @@
-"""Validate the current-state sales fact every five minutes.
-
-The fact is a ClickHouse view over the latest CDC state. No periodic INSERT is
-needed, so reruns cannot duplicate historical sales.
-"""
-
+"""Materialize and publish the Silver/Gold warehouse every five minutes."""
+from datetime import datetime, timedelta
 import os
-import logging
-from datetime import datetime
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
-logger = logging.getLogger(__name__)
-
-CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "clickhouse")
-CLICKHOUSE_HTTP_PORT = os.getenv("CLICKHOUSE_HTTP_PORT", "8123")
-CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
-CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "")
-
-ETL_SQL_PATH = "/opt/airflow/dags/sql/etl_fact_sales_product.sql"
+from helpers.warehouse_refresh import Refresher, refresh_lock
 
 
 def run_etl(**kwargs):
-    """Query the fact through ClickHouse HTTP to detect pipeline failures."""
-    import urllib.request
-    import urllib.parse
+    with refresh_lock():
+        job = Refresher()
+        result = job.refresh()
+        # Cleanup is a separate task: retention failure cannot mark a published
+        # generation as an unsuccessful ETL and trigger a misleading rollback.
+        return result
 
-    with open(ETL_SQL_PATH, encoding="utf-8") as sql_file:
-        sql = sql_file.read()
-    logger.info("Loaded fact validation SQL from %s", ETL_SQL_PATH)
 
-    # Execute via ClickHouse HTTP API
-    url = f"http://{CLICKHOUSE_HOST}:{CLICKHOUSE_HTTP_PORT}/"
-
-    params = {}
-    if CLICKHOUSE_USER:
-        params["user"] = CLICKHOUSE_USER
-    if CLICKHOUSE_PASSWORD:
-        params["password"] = CLICKHOUSE_PASSWORD
-
-    query_url = url + "?" + urllib.parse.urlencode(params) if params else url
-
-    req = urllib.request.Request(
-        query_url,
-        data=sql.encode("utf-8"),
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=60) as response:
-            result = response.read().decode("utf-8")
-            logger.info("Gold fact validation completed. Response: %s", result)
-            return "FACT_SALES_PRODUCT validated"
-    except Exception as e:
-        logger.error("Gold fact validation failed: %s", e)
-        raise
+def cleanup_snapshots():
+    with refresh_lock():
+        return Refresher().cleanup(int(os.getenv("WAREHOUSE_RETENTION_HOURS", "2")))
 
 
 with DAG(
     dag_id="etl_fact_sales_product",
-    description="Validate the current-state sales fact every 5 minutes",
+    description="Build, validate and publish physical Silver/Gold snapshots",
     schedule="*/5 * * * *",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     max_active_runs=1,
-    tags=["ecommerce", "etl", "clickhouse", "gold"],
+    dagrun_timeout=timedelta(minutes=30),
+    default_args={"retries": 2, "retry_delay": timedelta(minutes=1),
+                  "execution_timeout": timedelta(minutes=20)},
+    tags=["ecommerce", "etl", "clickhouse", "silver", "gold"],
 ) as dag:
-
-    PythonOperator(
-        task_id="run_etl_fact_sales_product",
-        python_callable=run_etl,
-    )
+    refresh = PythonOperator(task_id="run_etl_fact_sales_product", python_callable=run_etl)
+    cleanup = PythonOperator(task_id="cleanup_old_snapshots", python_callable=cleanup_snapshots)
+    refresh >> cleanup
