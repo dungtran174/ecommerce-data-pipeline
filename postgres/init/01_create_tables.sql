@@ -1,11 +1,7 @@
--- =============================================================================
 -- E-Commerce OLTP Database Schema
 -- PostgreSQL 15
--- =============================================================================
 
--- =============================================
 -- 1. User & Role Management
--- =============================================
 
 CREATE TABLE IF NOT EXISTS users (
     id          SERIAL PRIMARY KEY,
@@ -30,9 +26,7 @@ CREATE TABLE IF NOT EXISTS role_user (
     created_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- =============================================
 -- 2. Geography (Regions, Provinces, Addresses)
--- =============================================
 
 CREATE TABLE IF NOT EXISTS regions (
     id          SERIAL PRIMARY KEY,
@@ -59,9 +53,7 @@ CREATE TABLE IF NOT EXISTS addresses (
     created_at      TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- =============================================
 -- 3. Product Catalog
--- =============================================
 
 -- Self-referencing: category_id points to parent category (NULL = root)
 CREATE TABLE IF NOT EXISTS categories (
@@ -102,9 +94,7 @@ CREATE TABLE IF NOT EXISTS product_tag (
     created_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- =============================================
 -- 4. Order Status & Payment/Shipping Methods
--- =============================================
 
 CREATE TABLE IF NOT EXISTS order_status (
     id                  SERIAL PRIMARY KEY,
@@ -136,9 +126,7 @@ CREATE TABLE IF NOT EXISTS shipping_methods (
     created_at              TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- =============================================
 -- 5. Marketing & Discounts
--- =============================================
 
 CREATE TABLE IF NOT EXISTS ads_campaigns (
     id              SERIAL PRIMARY KEY,
@@ -157,9 +145,7 @@ CREATE TABLE IF NOT EXISTS discounts (
     expired_at      TIMESTAMP
 );
 
--- =============================================
 -- 6. Orders & Transactions
--- =============================================
 
 CREATE TABLE IF NOT EXISTS orders (
     id                  SERIAL PRIMARY KEY,
@@ -212,9 +198,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     description         TEXT
 );
 
--- =============================================
 -- Indexes for performance
--- =============================================
 
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_created_at ON orders(created_at);

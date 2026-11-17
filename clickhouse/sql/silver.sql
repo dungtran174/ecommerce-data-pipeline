@@ -1,4 +1,5 @@
--- SELECT definitions used to build physical Silver snapshots.
+-- Templates parsed by warehouse.refresh into stored tables; do not execute directly.
+-- SELECT definitions used to build physical Silver upserts.
 CREATE DATABASE IF NOT EXISTS silver;
 
 CREATE VIEW IF NOT EXISTS silver.users AS

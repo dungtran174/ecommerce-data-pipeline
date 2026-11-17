@@ -1,7 +1,4 @@
-"""
-Faker-based data generators for the e-commerce OLTP database.
-Each method generates realistic data for a specific table or group of tables.
-"""
+"""Faker-based data generators for the e-commerce OLTP database."""
 
 import random
 import logging
@@ -9,14 +6,12 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta
 from faker import Faker
 
-fake = Faker("vi_VN")  # Vietnamese locale for realistic names/addresses
+fake = Faker("vi_VN")
 Faker.seed(42)
 
 logger = logging.getLogger(__name__)
 
-# =============================================
 # Constants
-# =============================================
 
 VIETNAM_REGIONS = [
     "Đông Bắc Bộ",
@@ -160,19 +155,14 @@ class FakeDataGenerator:
     def __init__(self):
         self.fake = fake
 
-    # ----- Geography -----
+    # Geography
 
     def generate_regions(self):
         """Return list of region tuples: (region_name,)"""
         return [(name,) for name in VIETNAM_REGIONS]
 
     def generate_provinces(self, region_id_map):
-        """
-        Return list of province tuples: (province_name, region_id, lat, lon)
-
-        Args:
-            region_id_map: dict mapping region_name -> region_id from DB
-        """
+        """Return list of province tuples: (province_name, region_id, lat, lon)"""
         provinces = []
         for region_name, province_list in VIETNAM_PROVINCES.items():
             region_id = region_id_map.get(region_name)
@@ -181,13 +171,13 @@ class FakeDataGenerator:
                     provinces.append((name, region_id, lat, lon))
         return provinces
 
-    # ----- Tags -----
+    # Tags
 
     def generate_tags(self):
         """Return list of tag tuples: (tag_name,)"""
         return [(tag,) for tag in PRODUCT_TAGS]
 
-    # ----- Brands -----
+    # Brands
 
     def generate_brands(self, count=5):
         """Generate random brand names."""
@@ -197,7 +187,7 @@ class FakeDataGenerator:
             brands.append((name,))
         return brands
 
-    # ----- Categories -----
+    # Categories
 
     def generate_parent_categories(self):
         """Return list of parent category tuples: (category_name, parent_id, slug)"""
@@ -208,12 +198,7 @@ class FakeDataGenerator:
         return categories
 
     def generate_sub_categories(self, parent_id_map):
-        """
-        Return list of sub-category tuples: (category_name, parent_id, slug)
-
-        Args:
-            parent_id_map: dict mapping parent_category_name -> parent_id from DB
-        """
+        """Return list of sub-category tuples: (category_name, parent_id, slug)"""
         subs = []
         for parent_name, sub_list in SUB_CATEGORIES.items():
             parent_id = parent_id_map.get(parent_name)
@@ -223,7 +208,7 @@ class FakeDataGenerator:
                     subs.append((sub_name, parent_id, slug))
         return subs
 
-    # ----- Campaigns & Discounts -----
+    # Campaigns & Discounts
 
     def generate_campaigns(self, count=3):
         """Generate marketing campaigns with start/end dates."""
@@ -252,7 +237,7 @@ class FakeDataGenerator:
                 discounts.append((cid, disc_type, value, code, start, end))
         return discounts
 
-    # ----- Products -----
+    # Products
 
     def generate_products(self, category_ids, brand_ids, count=10):
         """Generate products linked to categories and brands."""
@@ -268,7 +253,7 @@ class FakeDataGenerator:
             products.append((name, cat_id, brand_id, price, cost, qty))
         return products
 
-    # ----- Users -----
+    # Users
 
     def generate_users(self, count=10):
         """Generate user accounts with Vietnamese names."""
@@ -281,34 +266,15 @@ class FakeDataGenerator:
             users.append((username, password, email, mobile))
         return users
 
-    # ----- Orders -----
+    # Orders
 
     def generate_order(self, user_id, address_id, product_list,
                        payment_method_ids, shipping_method_ids,
                        order_status_ids, payment_status_ids,
                        shipping_status_ids, discount=None):
-        """
-        Generate a complete order with order details.
-
-        Args:
-            user_id: customer user ID
-            address_id: delivery address ID
-            product_list: list of dicts with keys: id, product_price
-            payment_method_ids: list of valid payment method IDs
-            shipping_method_ids: list of valid shipping method IDs
-            order_status_ids: list of valid order status IDs
-            payment_status_ids: list of valid payment status IDs
-            shipping_status_ids: list of valid shipping status IDs
-            discount: optional row with id, type and value
-
-        Returns:
-            tuple: (order_data, order_details_list)
-        """
-        # Pick 1-5 random products for this order
+        """Generate a complete order with order details."""
         num_items = random.randint(1, min(5, len(product_list)))
         selected_products = random.sample(product_list, num_items)
-
-        # Calculate order details
         order_details = []
         order_amount = Decimal("0.00")
 
@@ -325,8 +291,6 @@ class FakeDataGenerator:
                 "product_tax": tax,
                 "subtotal_amount": subtotal,
             })
-
-        # Calculate discount
         discount_amount = Decimal("0.00")
         if discount:
             value = Decimal(str(discount["value"]))

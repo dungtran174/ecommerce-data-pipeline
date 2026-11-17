@@ -1,10 +1,8 @@
 #!/bin/bash
-# =============================================================================
 # Clean & Teardown Script
 # Usage:
 #   bash scripts/clean.sh            # Stop containers
 #   bash scripts/clean.sh --volumes  # Stop containers and wipe volumes
-# =============================================================================
 
 set -e
 

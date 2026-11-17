@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
-# One-Click Setup Script: Bootstrap Entire E-Commerce Real-time Data Pipeline
-# =============================================================================
+# Bootstrap the e-commerce pipeline.
 
 set -euo pipefail
 
@@ -10,7 +8,7 @@ ROOT_DIR="${SCRIPT_DIR}/.."
 cd "${ROOT_DIR}"
 
 echo "================================================================="
-echo "   E-Commerce Real-Time Data Pipeline — Environment Bootstrap"
+echo "   E-Commerce Data Pipeline — Environment Bootstrap"
 echo "================================================================="
 
 # 1. Check prerequisites
@@ -31,13 +29,22 @@ fi
 if [ ! -f .env ]; then
     echo "[1/4] Creating .env from .env.example..."
     cp .env.example .env
-    echo "  ✓ .env created."
 else
     echo "[1/4] .env already exists."
 fi
 
-# 3. Start the data path first. New synthetic orders should only be generated
-# after the cost snapshot schema and trigger are in place.
+python3 - <<'ENV_CHECK'
+from pathlib import Path
+unfilled = []
+for line in Path('.env').read_text().splitlines():
+    key, sep, value = line.partition('=')
+    if sep and not key.lstrip().startswith('#') and value.strip().strip("\"'").startswith('your_'):
+        unfilled.append(key.strip())
+if unfilled:
+    raise SystemExit('Replace placeholders in .env: ' + ', '.join(unfilled))
+ENV_CHECK
+
+# Apply migrations before enabling source generation.
 echo "[2/4] Starting core Docker services in background..."
 ${DOCKER_COMPOSE_CMD} up -d postgres-main kafka clickhouse debezium
 
@@ -78,7 +85,7 @@ echo "  - Enabling CDC quarantine and parser-error recovery..."
 ${DOCKER_COMPOSE_CMD} exec -T clickhouse sh -lc \
     'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --multiquery' \
     < clickhouse/init/05_quarantine_events.sql
-python3 scripts/migrate_kafka_consumers.py
+python3 scripts/migrations/kafka_consumers.py
 ${DOCKER_COMPOSE_CMD} exec -T postgres-main sh -lc \
     'psql -X -v ON_ERROR_STOP=1 -1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
     < postgres/init/03_snapshot_unit_cost.sql
@@ -86,7 +93,7 @@ ${DOCKER_COMPOSE_CMD} exec -T postgres-main sh -lc \
 echo "  - Checking Debezium..."
 bash "${SCRIPT_DIR}/register_connector.sh"
 
-echo "  - Building and publishing the physical Silver/Gold warehouse..."
+echo "  - Initializing incremental Silver/Gold processing..."
 # Derived-layer migration only: never reset source data or Kafka offsets.
 for attempt in $(seq 1 3); do
     if ${DOCKER_COMPOSE_CMD} --profile warehouse run --build --rm --no-deps warehouse-refresh --migrate; then
@@ -163,5 +170,5 @@ echo "  • ClickHouse HTTP:     http://localhost:$(env_port CLICKHOUSE_HTTP_POR
 echo "  • PostgreSQL OLTP:     localhost:$(env_port POSTGRES_PORT 5432)"
 echo "================================================================="
 echo "  Next steps:"
-echo "    - Enable seed, catalog, user, and order DAGs; enable etl_fact_sales_product to refresh Silver/Gold every 5 minutes."
+echo "    - Run seed_catalog, then generate_users; enable generate_users, generate_orders and refresh_warehouse."
 echo "================================================================="

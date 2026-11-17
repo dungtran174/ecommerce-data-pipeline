@@ -1,4 +1,5 @@
--- SELECT definitions used to build physical Gold snapshots.
+-- Templates parsed by warehouse.refresh into stored tables; do not execute directly.
+-- SELECT definitions used to build affected-date Gold partitions.
 CREATE DATABASE IF NOT EXISTS gold;
 
 CREATE VIEW IF NOT EXISTS gold.dim_date AS
@@ -55,12 +56,14 @@ WHERE lower(os.name) = 'delivered';
 CREATE VIEW IF NOT EXISTS gold.sales_line_preliminary AS
 SELECT *,
        if(order_amount > 0,
-          round(discount_amount * subtotal_amount / order_amount, 2),
-          toDecimal64(0, 4)) AS preliminary_discount,
+          round(toDecimal128(discount_amount, 4) * toDecimal128(subtotal_amount, 4)
+                / toDecimal128(order_amount, 4), 2),
+          toDecimal128(0, 8)) AS preliminary_discount,
        row_number() OVER (PARTITION BY order_id ORDER BY order_item_id DESC) AS reverse_line_number,
        sum(if(order_amount > 0,
-              round(discount_amount * subtotal_amount / order_amount, 2),
-              toDecimal64(0, 4))) OVER (PARTITION BY order_id) AS preliminary_total
+              round(toDecimal128(discount_amount, 4) * toDecimal128(subtotal_amount, 4)
+                / toDecimal128(order_amount, 4), 2),
+              toDecimal128(0, 8))) OVER (PARTITION BY order_id) AS preliminary_total
 FROM gold.sales_line_base;
 
 CREATE VIEW IF NOT EXISTS gold.sales_line_allocated AS
@@ -73,7 +76,8 @@ FROM gold.sales_line_preliminary;
 CREATE VIEW IF NOT EXISTS gold.sales_line_measured AS
 SELECT *,
        if(subtotal_amount > 0,
-          round(discount_gross * gmv / subtotal_amount, 2),
+          round(toDecimal128(discount_gross, 4) * toDecimal128(gmv, 4)
+                / toDecimal128(subtotal_amount, 4), 2),
           toDecimal128(0, 8)) AS discount_ex_vat
 FROM gold.sales_line_allocated;
 

@@ -1,3 +1,3 @@
 -- Physical warehouse objects are initialized by scripts/refresh_warehouse.sh.
--- See airflow/dags/sql/warehouse.
+-- See clickhouse/sql.
 CREATE DATABASE IF NOT EXISTS gold ENGINE = Atomic;

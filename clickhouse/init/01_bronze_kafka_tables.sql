@@ -1,10 +1,8 @@
--- =============================================================================
 -- ClickHouse Bronze Layer
 -- Kafka Engine → Materialized View → ReplacingMergeTree
 -- Kafka offsets version each key within its topic partition (one partition per topic).
 -- DELETE events remain as tombstone-state rows; query with FINAL and _deleted = 0.
 -- Each OLTP table maps to: kafka_* → mv_* → bronze.*
--- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS bronze;
 
@@ -30,7 +28,8 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.users,ecommerce_cdc.public.roles,ecommerce_cdc.public.role_user,ecommerce_cdc.public.regions,ecommerce_cdc.public.provinces,ecommerce_cdc.public.addresses,ecommerce_cdc.public.categories,ecommerce_cdc.public.brands,ecommerce_cdc.public.tags,ecommerce_cdc.public.products,ecommerce_cdc.public.product_tag,ecommerce_cdc.public.order_status,ecommerce_cdc.public.payment_status,ecommerce_cdc.public.shipping_status,ecommerce_cdc.public.payment_methods,ecommerce_cdc.public.shipping_methods,ecommerce_cdc.public.ads_campaigns,ecommerce_cdc.public.discounts,ecommerce_cdc.public.orders,ecommerce_cdc.public.orderdetails,ecommerce_cdc.public.order_status_history,ecommerce_cdc.public.transactions',
     kafka_group_name = 'clickhouse_bronze_raw_events',
     kafka_format = 'RawBLOB',
-    kafka_num_consumers = 4;
+    kafka_num_consumers = 1,
+    kafka_flush_interval_ms = 1000;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS bronze.mv_raw_events TO bronze.raw_events AS
 SELECT
@@ -41,9 +40,7 @@ SELECT
     now() AS ingested_at
 FROM bronze.kafka_raw_events;
 
--- =============================================
 -- 1. USERS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_users (
     id           Int32,
@@ -58,6 +55,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.users',
     kafka_group_name = 'clickhouse_bronze_users',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.users (
@@ -78,9 +76,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_users;
 
--- =============================================
 -- 2. ROLES
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_roles (
     id           Int32,
@@ -96,6 +92,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.roles',
     kafka_group_name = 'clickhouse_bronze_roles',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.roles (
@@ -118,9 +115,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_roles;
 
--- =============================================
 -- 3. ROLE_USER
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_role_user (
     id           Int32,
@@ -136,6 +131,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.role_user',
     kafka_group_name = 'clickhouse_bronze_role_user',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.role_user (
@@ -158,9 +154,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_role_user;
 
--- =============================================
 -- 4. REGIONS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_regions (
     id           Int32,
@@ -175,6 +169,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.regions',
     kafka_group_name = 'clickhouse_bronze_regions',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.regions (
@@ -195,9 +190,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_regions;
 
--- =============================================
 -- 5. PROVINCES
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_provinces (
     id              Int32,
@@ -215,6 +208,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.provinces',
     kafka_group_name = 'clickhouse_bronze_provinces',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.provinces (
@@ -241,9 +235,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_provinces;
 
--- =============================================
 -- 6. ADDRESSES
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_addresses (
     id              Int32,
@@ -261,6 +253,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.addresses',
     kafka_group_name = 'clickhouse_bronze_addresses',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.addresses (
@@ -287,9 +280,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_addresses;
 
--- =============================================
 -- 7. CATEGORIES (self-referencing)
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_categories (
     id              Int32,
@@ -306,6 +297,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.categories',
     kafka_group_name = 'clickhouse_bronze_categories',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.categories (
@@ -330,9 +322,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_categories;
 
--- =============================================
 -- 8. BRANDS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_brands (
     id           Int32,
@@ -347,6 +337,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.brands',
     kafka_group_name = 'clickhouse_bronze_brands',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.brands (
@@ -367,9 +358,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_brands;
 
--- =============================================
 -- 9. TAGS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_tags (
     id           Int32,
@@ -384,6 +373,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.tags',
     kafka_group_name = 'clickhouse_bronze_tags',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.tags (
@@ -404,9 +394,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_tags;
 
--- =============================================
 -- 10. PRODUCTS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_products (
     id                  Int32,
@@ -426,6 +414,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.products',
     kafka_group_name = 'clickhouse_bronze_products',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.products (
@@ -456,9 +445,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_products;
 
--- =============================================
 -- 11. PRODUCT_TAG
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_product_tag (
     id           Int32,
@@ -474,6 +461,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.product_tag',
     kafka_group_name = 'clickhouse_bronze_product_tag',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.product_tag (
@@ -496,9 +484,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_product_tag;
 
--- =============================================
 -- 12. ORDER_STATUS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_orderstatus (
     id                  Int32,
@@ -513,6 +499,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.order_status',
     kafka_group_name = 'clickhouse_bronze_orderstatus',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.orderstatus (
@@ -533,9 +520,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_orderstatus;
 
--- =============================================
 -- 13. PAYMENT_STATUS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_paymentstatus (
     id                      Int32,
@@ -550,6 +535,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.payment_status',
     kafka_group_name = 'clickhouse_bronze_paymentstatus',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.paymentstatus (
@@ -570,9 +556,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_paymentstatus;
 
--- =============================================
 -- 14. SHIPPING_STATUS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_shippingstatus (
     id                      Int32,
@@ -587,6 +571,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.shipping_status',
     kafka_group_name = 'clickhouse_bronze_shippingstatus',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.shippingstatus (
@@ -607,9 +592,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_shippingstatus;
 
--- =============================================
 -- 15. PAYMENT_METHODS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_paymentmethods (
     id                      Int32,
@@ -624,6 +607,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.payment_methods',
     kafka_group_name = 'clickhouse_bronze_paymentmethods',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.paymentmethods (
@@ -644,9 +628,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_paymentmethods;
 
--- =============================================
 -- 16. SHIPPING_METHODS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_shippingmethods (
     id                      Int32,
@@ -661,6 +643,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.shipping_methods',
     kafka_group_name = 'clickhouse_bronze_shippingmethods',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.shippingmethods (
@@ -681,9 +664,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_shippingmethods;
 
--- =============================================
 -- 17. ADS_CAMPAIGNS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_adscampaigns (
     id              Int32,
@@ -699,6 +680,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.ads_campaigns',
     kafka_group_name = 'clickhouse_bronze_adscampaigns',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.adscampaigns (
@@ -721,9 +703,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_adscampaigns;
 
--- =============================================
 -- 18. DISCOUNTS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_discounts (
     id              Int32,
@@ -742,6 +722,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.discounts',
     kafka_group_name = 'clickhouse_bronze_discounts',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.discounts (
@@ -770,9 +751,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_discounts;
 
--- =============================================
--- 19. ORDERS (high throughput: 4 consumers)
--- =============================================
+-- 19. ORDERS (one partition, one active consumer)
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_orders (
     id                  Int32,
@@ -800,7 +779,8 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.orders',
     kafka_group_name = 'clickhouse_bronze_orders',
     kafka_format = 'JSONEachRow',
-    kafka_num_consumers = 4,
+    kafka_num_consumers = 1,
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.orders (
@@ -847,9 +827,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_orders;
 
--- =============================================
--- 20. ORDERDETAILS (high throughput: 4 consumers)
--- =============================================
+-- 20. ORDERDETAILS
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_orderdetails (
     id              Int32,
@@ -870,7 +848,8 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.orderdetails',
     kafka_group_name = 'clickhouse_bronze_orderdetails',
     kafka_format = 'JSONEachRow',
-    kafka_num_consumers = 4,
+    kafka_num_consumers = 1,
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.orderdetails (
@@ -903,9 +882,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_orderdetails;
 
--- =============================================
 -- 21. ORDER_STATUS_HISTORY
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_orderstatushistory (
     id              Int32,
@@ -923,6 +900,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.order_status_history',
     kafka_group_name = 'clickhouse_bronze_orderstatushistory',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.orderstatushistory (
@@ -949,9 +927,7 @@ SELECT
     toUInt8(__op = 'd') AS _deleted
 FROM bronze.kafka_orderstatushistory;
 
--- =============================================
 -- 22. TRANSACTIONS
--- =============================================
 
 CREATE TABLE IF NOT EXISTS bronze.kafka_transactions (
     id                  Int32,
@@ -969,6 +945,7 @@ SETTINGS
     kafka_topic_list = 'ecommerce_cdc.public.transactions',
     kafka_group_name = 'clickhouse_bronze_transactions',
     kafka_format = 'JSONEachRow',
+    kafka_flush_interval_ms = 1000,
     kafka_skip_broken_messages = 100;
 
 CREATE TABLE IF NOT EXISTS bronze.transactions (

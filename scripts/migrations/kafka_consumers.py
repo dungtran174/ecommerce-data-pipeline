@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Recreate typed ClickHouse Kafka consumers with a bounded parser-error skip.
-
-ClickHouse 24 cannot ALTER Kafka engine settings. DDL comes from the checked-in
-fresh-install schema so an interrupted migration can be rerun. Kafka group
-names stay unchanged, preserving committed offsets in the broker.
-"""
+"""Recreate typed ClickHouse Kafka consumers with a bounded parser-error skip."""
 
 import json
 import re
@@ -12,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "clickhouse/init/01_bronze_kafka_tables.sql"
 TARGET_SKIP = 100
 CLIENT = [
@@ -52,6 +47,11 @@ def source_definitions():
 
 def main() -> None:
     tables, views = source_definitions()
+    # Stop consumers before replacing views; recover interrupted detaches.
+    detached = clickhouse("SELECT table FROM system.detached_tables WHERE database='bronze' FORMAT TabSeparatedRaw")
+    for table in detached.splitlines():
+        if table.startswith('kafka_') and table[6:] in tables:
+            clickhouse(f"ATTACH TABLE bronze.{table};")
     rows = clickhouse(
         "SELECT name, create_table_query FROM system.tables "
         "WHERE database='bronze' FORMAT JSONEachRow"
@@ -65,14 +65,21 @@ def main() -> None:
         table_name = f"kafka_{suffix}"
         view_name = f"mv_{suffix}"
         existing = current.get(table_name, "")
-        if f"kafka_skip_broken_messages = {TARGET_SKIP}" in existing:
+        if (f"kafka_skip_broken_messages = {TARGET_SKIP}" in existing
+                and "kafka_flush_interval_ms = 1000" in existing
+                and "kafka_num_consumers = 4" not in existing
+                and (suffix != 'orderdetails' or
+                     ('unit_cost_at_order' in existing and
+                      (view_name not in current or 'unit_cost_at_order' in current[view_name])))):
             if view_name not in current:
                 clickhouse(views[suffix] + ";")
                 repaired_views.append(suffix)
             continue
         clickhouse(
-            f"DROP TABLE IF EXISTS bronze.{view_name};\n"
-            f"DROP TABLE IF EXISTS bronze.{table_name};\n"
+            (f"DETACH TABLE bronze.{table_name};\n" if existing else "")
+            + f"DROP TABLE IF EXISTS bronze.{view_name};\n"
+            + (f"ATTACH TABLE bronze.{table_name};\n" if existing else "")
+            + f"DROP TABLE IF EXISTS bronze.{table_name};\n"
             + tables[suffix] + ";\n"
             + views[suffix] + ";\n"
         )

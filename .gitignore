@@ -1,6 +1,4 @@
-# =============================================================================
 # Git Ignore — E-Commerce Real-time Data Pipeline
-# =============================================================================
 
 # Environment variables & secrets
 .env
@@ -20,7 +18,6 @@ metabase-data/
 
 # Airflow logs & run artifacts
 airflow/logs/
-airflow/plugins/__pycache__/
 airflow/dags/__pycache__/
 
 # Python cache & virtual environments
@@ -52,7 +49,3 @@ Thumbs.db
 desktop.ini
 *.tmp
 *.bak
-
-# Local integration checks (kept on this machine, not published)
-/tests/
-/scripts/verify_pipeline.sh
