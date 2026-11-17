@@ -21,8 +21,8 @@ Sales reports include delivered orders, allocate discounts to order lines, and u
 Requires Docker Compose v2, Python 3, `curl`, and `jq`.
 
 ```bash
-git clone https://github.com/dungtran174/ecommerce-realtime-data-pipeline.git
-cd ecommerce-realtime-data-pipeline
+git clone https://github.com/dungtran174/ecommerce-data-pipeline.git
+cd ecommerce-data-pipeline
 cp .env.example .env
 ```
 
